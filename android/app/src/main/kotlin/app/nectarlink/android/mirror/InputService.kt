@@ -81,6 +81,18 @@ class InputService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    /**
+     * The PC's input on an app window's display: its text goes into the
+     * focused field on that display, not on the phone's own screen (where,
+     * locked, the lock screen is). Everything else is the same as the mirror.
+     */
+    private fun handle(input: MirrorInputEvent, displayId: Int) {
+        when (input) {
+            is MirrorInputEvent.Text -> type(input.text, displayId)
+            else -> handle(input)
+        }
+    }
+
     private fun handle(input: MirrorInputEvent) {
         when (input) {
             is MirrorInputEvent.Touch -> touch(input.action, input.x, input.y)
@@ -268,6 +280,9 @@ class InputService : AccessibilityService() {
 
     private fun type(typed: String) = edit { text, start, end -> Edit(text.replaceRange(start, end, typed), start + typed.length) }
 
+    private fun type(typed: String, displayId: Int) =
+        edit(displayId) { text, start, end -> Edit(text.replaceRange(start, end, typed), start + typed.length) }
+
     private data class Edit(val text: String, val cursor: Int)
 
     private var pendingText: String? = null
@@ -275,9 +290,14 @@ class InputService : AccessibilityService() {
     private var pendingAt: Long = 0L
 
     /** Changes the focused text field: its text and selection in, the new text and cursor out. */
-    private fun edit(change: (String, Int, Int) -> Edit?) {
-        val node = focused() ?: return
-        if (!isNodeEditable(node)) return
+    private fun edit(change: (String, Int, Int) -> Edit?) = edit(focused(), change)
+
+    /** The same for the focused text field on [displayId], an app window's display. */
+    private fun edit(displayId: Int, change: (String, Int, Int) -> Edit?) =
+        edit(focusedOnDisplay(displayId), change)
+
+    private fun edit(node: AccessibilityNodeInfo?, change: (String, Int, Int) -> Edit?) {
+        if (node == null || !isNodeEditable(node)) return
         runCatching { node.refresh() }
         val showingHint = node.isShowingHintText
         val rawText = if (showingHint) "" else node.text?.toString().orEmpty()
@@ -335,6 +355,25 @@ class InputService : AccessibilityService() {
         return findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
     }
 
+    /**
+     * The focused text field on [displayId], an app window's own display.
+     * [focused] looks at the phone's screen, which while the phone is locked
+     * is the lock screen; this looks at the windows Android shows on that
+     * display instead.
+     */
+    private fun focusedOnDisplay(displayId: Int): AccessibilityNodeInfo? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        val windows = runCatching { getWindowsOnAllDisplays().get(displayId) }.getOrNull().orEmpty()
+        val roots = windows.mapNotNull { runCatching { it.root }.getOrNull() }
+        for (root in roots) {
+            findEditable(root, requireFocused = true)?.let { return it }
+        }
+        for (root in roots) {
+            findEditable(root, requireFocused = false)?.let { return it }
+        }
+        return null
+    }
+
     private fun findEditable(node: AccessibilityNodeInfo?, requireFocused: Boolean): AccessibilityNodeInfo? {
         if (node == null) return null
         if (isNodeEditable(node) && (!requireFocused || node.isFocused)) return node
@@ -367,6 +406,12 @@ class InputService : AccessibilityService() {
         fun handle(input: MirrorInputEvent) {
             val service = instance ?: return
             service.main.post { service.handle(input) }
+        }
+
+        /** The PC's text into the focused field on [displayId], an app window's display. */
+        fun handle(input: MirrorInputEvent, displayId: Int) {
+            val service = instance ?: return
+            service.main.post { service.handle(input, displayId) }
         }
 
         /** Whether it's turned on in Settings (it may not be running yet). */

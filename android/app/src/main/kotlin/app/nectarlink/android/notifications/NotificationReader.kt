@@ -19,6 +19,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
+import app.nectarlink.android.mirror.TYPING_HINT_TAG
 import app.nectarlink.android.sms.PhoneSms
 import app.nectarlink.core.LivePoint
 import app.nectarlink.core.LiveSegment
@@ -68,7 +69,10 @@ internal class NotificationReader(private val context: Context) {
 
     private fun shouldMirror(sbn: StatusBarNotification, live: NotificationLive?): Boolean {
         val n = sbn.notification
-        if (sbn.packageName == context.packageName) return false
+        // Our own notifications aren't mirrored, except the hint that typed text
+        // needs the phone unlocked: the PC is where the typing happens, so
+        // that is where it must be seen.
+        if (sbn.packageName == context.packageName && sbn.tag != TYPING_HINT_TAG) return false
         val alwaysSkipped = Notification.FLAG_GROUP_SUMMARY or Notification.FLAG_LOCAL_ONLY
         if (n.flags and alwaysSkipped != 0) return false
         // Media players get their own feature.

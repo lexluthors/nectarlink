@@ -126,6 +126,9 @@
         <item quantity="other">%1$d apps are open in windows on a PC</item>
     </plurals>
     <string name="app_windows_text">Shown on %1$s. They run here, beside what\'s on your screen.</string>
+    <string name="channel_typing_hints">Typing hints</string>
+    <string name="typing_hint_title">Typed text didn\'t reach the phone</string>
+    <string name="typing_hint_text">The phone is locked, so text from the PC can\'t be pasted. Unlock the phone, or turn on NectarLink under Settings › Accessibility.</string>
     <string name="action_close_all">Close all</string>
     <string name="settings_calls_and_contacts">Calls, contacts and messages</string>
     <string name="sms_title">Text from your PC</string>

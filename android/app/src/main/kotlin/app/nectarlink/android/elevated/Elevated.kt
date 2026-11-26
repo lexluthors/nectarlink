@@ -660,7 +660,7 @@ object Elevated {
                 event.text.isEmpty() -> true
                 event.text == "\n" || event.text == "\r" || event.text == "\r\n" ->
                     send(writer, "${to}K ${KeyEvent.KEYCODE_ENTER}")
-                event.text.length == 1 && event.text[0].code in 32..126 -> send(writer, "${to}T ${event.text}")
+                typesAsKeys(event.text) -> send(writer, "${to}T ${event.text}")
                 // The clipboard is the phone's own, whichever display the text is for.
                 else -> setClipboard(event.text, null) && send(writer, "${to}K ${KeyEvent.KEYCODE_PASTE}")
             }
@@ -669,6 +669,16 @@ object Elevated {
         }
         return send(writer, line)
     }
+
+    /**
+     * Whether [text] is typed on the phone as key presses (plain keys and
+     * Enter) rather than pasted from its clipboard. While the phone is
+     * locked, Android lets no app read its clipboard, so text that would be
+     * pasted needs the accessibility service instead (see `AppWindows`).
+     */
+    fun typesAsKeys(text: String): Boolean =
+        text.isEmpty() || text == "\n" || text == "\r" || text == "\r\n" ||
+            (text.length == 1 && text[0].code in 32..126)
 
     /** Sends a gamepad state directly through the Elevated helper. */
     fun sendGamepad(buttons: Int, lx: Int, ly: Int, rx: Int, ry: Int, lt: Int, rt: Int): Boolean {

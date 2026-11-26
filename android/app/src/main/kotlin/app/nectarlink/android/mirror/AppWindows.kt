@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.nectarlink.android.mirror
 
+import android.app.KeyguardManager
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,6 +13,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
@@ -32,6 +37,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+/**
+ * The tag of the hint that typed text needs the phone unlocked. It is
+ * mirrored to the PC like any other app's notification (see
+ * `NotificationReader`), which is how the PC learns about it.
+ */
+internal const val TYPING_HINT_TAG = "nectarlink.typing_hint"
 
 /**
  * Phone apps in windows of their own on a PC (Elevated): each runs on a
@@ -180,8 +192,67 @@ class AppWindows(
     fun input(pc: String, session: UInt, event: MirrorInputEvent) {
         val window = windows[pc to session] ?: return
         if (window.display < 0) return
+        // Locked, Android lets no app read the clipboard, so the paste path
+        // can't put text into a field; the accessibility service sets the
+        // field's text itself, with no clipboard involved.
+        if (event is MirrorInputEvent.Text && !Elevated.typesAsKeys(event.text) && locked()) {
+            if (InputService.running) {
+                InputService.handle(event, window.display)
+                return
+            }
+            sayTypingNeedsUnlock(pc)
+        }
         Elevated.handleOn(window.display, window.width.toFloat(), window.height.toFloat(), event)
     }
+
+    /** Whether the phone is locked, which is when apps can't read its clipboard. */
+    private fun locked(): Boolean =
+        context.getSystemService(KeyguardManager::class.java)?.isDeviceLocked == true
+
+    /**
+     * Says why typed text won't go in while the phone is locked and the
+     * accessibility service is off: as a notification, which the PC mirrors
+     * like any other phone notification. At most once every
+     * [HINT_EVERY_MS] per PC, so typing a word doesn't post a dozen.
+     */
+    private fun sayTypingNeedsUnlock(pc: String) {
+        val now = SystemClock.elapsedRealtime()
+        val last = hintAt[pc]
+        if (last != null && now - last < HINT_EVERY_MS) return
+        hintAt[pc] = now
+        val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!allowed) return
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                HINT_CHANNEL,
+                context.getString(R.string.channel_typing_hints),
+                NotificationManager.IMPORTANCE_LOW,
+            ),
+        )
+        val openSettings = PendingIntent.getActivity(
+            context, 0, InputService.settingsIntent(),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val notification = Notification.Builder(context, HINT_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.typing_hint_title))
+            .setContentText(context.getString(R.string.typing_hint_text))
+            .setContentIntent(openSettings)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(Notification.CATEGORY_REMINDER)
+            .build()
+        try {
+            manager.notify(TYPING_HINT_TAG, HINT_NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            Log.i(TAG, "can't hint about typing", e)
+        }
+    }
+
+    /** When each PC was last told that typing needs the phone unlocked. */
+    private val hintAt = ConcurrentHashMap<String, Long>()
 
     /** The phone's screen, in pixels. */
     private fun screen(): Pair<Int, Int> {
@@ -266,6 +337,10 @@ class AppWindows(
     companion object {
         private const val TAG = "AppWindows"
         private const val NOTIFICATION_ID = 7
+        /** The channel of the "typing needs the phone unlocked" hint (see [sayTypingNeedsUnlock]). */
+        private const val HINT_CHANNEL = "typing_hints"
+        private const val HINT_NOTIFICATION_ID = 42
+        private const val HINT_EVERY_MS = 5 * 60_000L
         /** Packets from the helper, at most. */
         private const val MAX_PACKET = 8 shl 20
 
