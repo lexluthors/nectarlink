@@ -59,3 +59,9 @@ aqtinstall.log
 
 # Kotlin compiler session data
 .kotlin/
+
+# ---- Local toolchains, build output and tool state (not source) ----
+.qt-tools/
+.qt6-sysroot/
+dist/
+.claude/
