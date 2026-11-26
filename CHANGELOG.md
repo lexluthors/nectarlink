@@ -141,6 +141,13 @@ has a Stop button. Choosing another
 
 ### Fixed
 
+- **Typing Chinese in the Linux app did nothing.** The app's bundled
+  Qt 6.12 had no input method plugins at all: the distro's fcitx5 plugin is
+  built for the distro's older Qt and cannot load into Qt 6.12, and Qt's own
+  ibus and compose plugins weren't packaged either. Every text field, and
+  typing into a mirrored phone, could only take plain ASCII. Packages now
+  include Qt's input contexts and an fcitx5 plugin built against the bundled
+  Qt, and **Type on phone** takes input-method text too.
 - **Find my phone could ring too quietly to hear** when the alarm volume
   was low. It now rings at full alarm volume and puts your volume back
   afterwards, even if the app is closed mid-ring. Do Not Disturb still

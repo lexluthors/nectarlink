@@ -377,6 +377,8 @@ fn main() {
             "cpp/native_window.cpp",
             "cpp/video_view.h",
             "cpp/video_view.cpp",
+            "cpp/text_capture.h",
+            "cpp/text_capture.cpp",
         ])
         .qrc(fonts_qrc())
         .qrc(shaders_qrc())
@@ -427,4 +429,6 @@ fn main() {
     println!("cargo:rerun-if-changed=cpp/native_window.cpp");
     println!("cargo:rerun-if-changed=cpp/video_view.h");
     println!("cargo:rerun-if-changed=cpp/video_view.cpp");
+    println!("cargo:rerun-if-changed=cpp/text_capture.h");
+    println!("cargo:rerun-if-changed=cpp/text_capture.cpp");
 }

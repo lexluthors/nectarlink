@@ -264,7 +264,7 @@ docs/                    Guide, technical docs, protocol, design system    (CC B
 |---|---|
 | Core and CLI | [Rust](https://rustup.rs) (stable, pinned in `rust-toolchain.toml`) |
 | Windows app | Windows 11, Visual Studio 2022 Build Tools (C++), [Qt 6.12](https://www.qt.io/download-open-source) for MSVC 2022 x64 |
-| Linux app | Ubuntu 24.04 or newer (glibc 2.39), a C++17 compiler, pkg-config, the X11, Wayland and D-Bus development packages, [Qt 6.12](https://www.qt.io/download-open-source) (`gcc_64`, with Qt Shader Tools and Qt Wayland Compositor) |
+| Linux app | Ubuntu 24.04 or newer (glibc 2.39), a C++17 compiler, pkg-config, the X11, Wayland and D-Bus development packages, [Qt 6.12](https://www.qt.io/download-open-source) (`gcc_64`, with Qt Shader Tools and Qt Wayland Compositor), and `libfcitx5utils-dev` (to bundle the fcitx5 input method plugin) |
 | macOS app | macOS 14+, Xcode Command Line Tools, [Qt 6.12](https://www.qt.io/download-open-source) (or Homebrew Qt 6) |
 | Android app | Android SDK (platform 37, NDK 30.0.16248370), JDK 17 or newer, `cargo-ndk` (see [android/README.md](android/README.md)) |
 

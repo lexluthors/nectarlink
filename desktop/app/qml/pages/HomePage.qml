@@ -2332,7 +2332,7 @@ Item {
                                     Mirror.stopKeyboard()
                                 } else {
                                     Mirror.toggleKeyboard(home.deviceId)
-                                    remoteKeyCapture.forceActiveFocus()
+                                    keyCapture.forceActiveFocus()
                                 }
                             }
                         }
@@ -2358,12 +2358,28 @@ Item {
                         }
                         radius: Theme.radiusMd
                         color: Theme.graphite ? "transparent" : Theme.surfaceContainerHigh
-                        border.width: activeFocus ? 2 : 1
-                        border.color: activeFocus ? Theme.primary : Theme.outlineVariant
-                        activeFocusOnTab: typeOnPhoneCard.activeHere
+                        border.width: keyCapture.activeFocus ? 2 : 1
+                        border.color: keyCapture.activeFocus ? Theme.primary : Theme.outlineVariant
 
                         onVisibleChanged: {
-                            if (visible) forceActiveFocus()
+                            if (visible) keyCapture.forceActiveFocus()
+                        }
+
+                        // Focus and input-method sink: the PC's input method
+                        // composes here, and only finished text goes to the
+                        // phone. Plain keys still reach Keys.onPressed below.
+                        TextCapture {
+                            id: keyCapture
+                            anchors.fill: parent
+                            z: -1
+                            acceptsText: typeOnPhoneCard.activeHere
+                            activeFocusOnTab: typeOnPhoneCard.activeHere
+                            onTextCommitted: (text) => {
+                                if (text.length === 0)
+                                    return
+                                Mirror.keyboardText(home.deviceId, text)
+                                typeOnPhoneCard.lastSent = text
+                            }
                         }
 
                         Keys.onPressed: (event) => {
@@ -2419,8 +2435,8 @@ Item {
                                     role: "bodySmall"
                                     weight: 600
                                     elide: Text.ElideRight
-                                    color: remoteKeyCapture.activeFocus ? Theme.primary : Theme.surfaceContent
-                                    text: remoteKeyCapture.activeFocus
+                                    color: keyCapture.activeFocus ? Theme.primary : Theme.surfaceContent
+                                    text: keyCapture.activeFocus
                                         ? qsTr("Type here: keys go to %1").arg(home.name)
                                         : qsTr("Click to focus keyboard")
                                 }
@@ -2442,12 +2458,12 @@ Item {
                                 onClicked: {
                                     Mirror.keyboardPaste(home.deviceId)
                                     typeOnPhoneCard.lastSent = qsTr("Clipboard")
-                                    remoteKeyCapture.forceActiveFocus()
+                                    keyCapture.forceActiveFocus()
                                 }
                             }
                         }
                         TapHandler {
-                            onTapped: remoteKeyCapture.forceActiveFocus()
+                            onTapped: keyCapture.forceActiveFocus()
                         }
                     }
                 }

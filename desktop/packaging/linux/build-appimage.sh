@@ -123,12 +123,29 @@ bundle_qt_runtime() {
             xcbglintegrations \
             imageformats \
             iconengines \
-            tls
+            tls \
+            platforminputcontexts
         do
             if [[ -d "${qt_plugins}/${plug_dir}" ]]; then
                 cp -a "${qt_plugins}/${plug_dir}" "${APPDIR}/usr/plugins/"
             fi
         done
+    fi
+
+    # Qt's own platform input contexts (compose, ibus) are built for the
+    # bundled Qt. fcitx5 needs its own plugin built against that same Qt.
+    local fcitx_stage="${STAGE_DIR}/fcitx5-qt"
+    if "${SCRIPT_DIR}/build-fcitx5-plugin.sh" "$("${qmake_bin}" -query QT_INSTALL_PREFIX)" "${fcitx_stage}"; then
+        mkdir -p "${APPDIR}/usr/plugins/platforminputcontexts"
+        cp -a "${fcitx_stage}/platforminputcontexts/." "${APPDIR}/usr/plugins/platforminputcontexts/"
+        cp -a "${fcitx_stage}/lib/." "${APPDIR}/usr/lib/"
+    elif [[ "${NECTARLINK_SKIP_FCITX5_QT:-0}" == "1" ]]; then
+        echo "warning: shipping without the fcitx5 Qt6 plugin (NECTARLINK_SKIP_FCITX5_QT=1)" >&2
+    else
+        echo "error: could not build the fcitx5 Qt6 input method plugin." >&2
+        echo "       Install its build dependencies (e.g. libfcitx5utils-dev, cmake, ninja-build)," >&2
+        echo "       or set NECTARLINK_SKIP_FCITX5_QT=1 to ship without fcitx5 input." >&2
+        exit 1
     fi
 
     if [[ -n "${qt_qml}" && -d "${qt_qml}" ]]; then
