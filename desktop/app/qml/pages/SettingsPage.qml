@@ -4,8 +4,9 @@ import QtQuick.Dialogs
 import app.nectarlink
 
 // Settings: two-pane categorized layout for appearance, general behavior,
-// paired devices & permissions, camera & audio, notifications, files & sync,
-// shortcuts & rules, storage & privacy, and connection & about.
+// paired devices & permissions, screen mirroring, camera & audio,
+// notifications, files & sync, shortcuts & rules, storage & privacy, and
+// connection & about.
 Item {
     id: page
     property bool active: false
@@ -19,6 +20,7 @@ Item {
         { id: "appearance", title: qsTr("Appearance"), icon: Icons.palette, subtitle: qsTr("Theme, mode & colors") },
         { id: "general", title: qsTr("General"), icon: Icons.laptop, subtitle: qsTr("Startup, clipboard & desktop") },
         { id: "devices", title: qsTr("Devices"), icon: Icons.phone, subtitle: qsTr("Paired phones & permissions") },
+        { id: "screen_mirroring", title: qsTr("Screen mirroring"), icon: Icons.mirror, subtitle: qsTr("Resolution, frame rate & bitrate") },
         { id: "camera_audio", title: qsTr("Camera & Audio"), icon: Icons.video, subtitle: qsTr("Webcam, speaker & calls") },
         { id: "notifications", title: qsTr("Notifications"), icon: Icons.bell, subtitle: qsTr("Do not disturb & app rules") },
         { id: "files_sync", title: qsTr("Files & Sync"), icon: Icons.folder, subtitle: qsTr("Folder sync, storage & recordings") },
@@ -1564,6 +1566,84 @@ Item {
                             }
                         }
                     }
+                }
+            }
+
+            // ================================================================
+            // 3b. SCREEN MIRRORING
+            // ================================================================
+            Column {
+                visible: page.currentSection === "screen_mirroring"
+                width: visible ? parent.width : 0
+                spacing: Theme.gutter
+
+                Card {
+                    width: parent.width
+                    Column {
+                        width: parent.width
+
+                        ListRow {
+                            width: parent.width
+                            iconPath: Icons.mirror
+                            title: qsTr("Resolution")
+                            description: qsTr("Longest side of the mirrored video, in pixels. Higher looks sharper.")
+                            Segmented {
+                                options: [
+                                    { value: "720", label: "720p" },
+                                    { value: "1080", label: "1080p" },
+                                    { value: "1440", label: "1440p" },
+                                    { value: "1920", label: "1920p" }
+                                ]
+                                value: String(Preferences.mirrorMaxSize)
+                                onPicked: (value) => Preferences.mirrorMaxSize = Number(value)
+                            }
+                        }
+
+                        Divider { width: parent.width }
+
+                        ListRow {
+                            width: parent.width
+                            iconPath: Icons.video
+                            title: qsTr("Frame rate")
+                            description: qsTr("60 fps is smoother; 30 fps uses less bandwidth.")
+                            Segmented {
+                                options: [
+                                    { value: "30", label: "30 fps" },
+                                    { value: "60", label: "60 fps" }
+                                ]
+                                value: String(Preferences.mirrorFps)
+                                onPicked: (value) => Preferences.mirrorFps = Number(value)
+                            }
+                        }
+
+                        Divider { width: parent.width }
+
+                        ListRow {
+                            width: parent.width
+                            iconPath: Icons.signal
+                            title: qsTr("Bitrate")
+                            description: qsTr("Target data a second for the phone's video. Higher is sharper with motion.")
+                            Segmented {
+                                options: [
+                                    { value: "4000000", label: "4 Mbps" },
+                                    { value: "8000000", label: "8 Mbps" },
+                                    { value: "12000000", label: "12 Mbps" },
+                                    { value: "16000000", label: "16 Mbps" },
+                                    { value: "20000000", label: "20 Mbps" }
+                                ]
+                                value: String(Preferences.mirrorBitrate)
+                                onPicked: (value) => Preferences.mirrorBitrate = Number(value)
+                            }
+                        }
+                    }
+                }
+
+                Txt {
+                    width: parent.width
+                    text: qsTr("Applies the next time the phone's screen or an app window opens.")
+                    role: "bodySmall"
+                    muted: true
+                    wrapMode: Text.WordWrap
                 }
             }
 

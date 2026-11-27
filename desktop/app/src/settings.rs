@@ -114,6 +114,43 @@ fn default_window_height() -> u32 {
     DEFAULT_WINDOW_HEIGHT
 }
 
+/// The long sides (pixels) a mirrored phone's video may have.
+pub const MIRROR_MAX_SIZES: [u32; 4] = [720, 1080, 1440, 1920];
+/// The target bitrates (bits a second) a mirrored phone's video may have.
+pub const MIRROR_BITRATES: [u32; 5] = [4_000_000, 8_000_000, 12_000_000, 16_000_000, 20_000_000];
+
+fn default_mirror_max_size() -> u32 {
+    1920
+}
+
+fn default_mirror_fps() -> u32 {
+    60
+}
+
+fn default_mirror_bitrate() -> u32 {
+    8_000_000
+}
+
+/// The closest of `allowed` to `value` (the first on a tie).
+fn nearest_allowed(value: u32, allowed: &[u32]) -> u32 {
+    allowed.iter().copied().min_by_key(|v| v.abs_diff(value)).unwrap_or(value)
+}
+
+/// Snaps a video long side to one of [`MIRROR_MAX_SIZES`].
+pub(crate) fn normalize_mirror_max_size(size: u32) -> u32 {
+    nearest_allowed(size, &MIRROR_MAX_SIZES)
+}
+
+/// Snaps a frame rate to the offered `30` or `60`.
+pub(crate) fn normalize_mirror_fps(fps: u32) -> u32 {
+    if fps >= 45 { 60 } else { 30 }
+}
+
+/// Snaps a bitrate to one of [`MIRROR_BITRATES`].
+pub(crate) fn normalize_mirror_bitrate(bitrate: u32) -> u32 {
+    nearest_allowed(bitrate, &MIRROR_BITRATES)
+}
+
 fn default_true() -> bool {
     true
 }
@@ -382,6 +419,17 @@ pub struct Settings {
     /// Horizontally mirror the webcam video.
     #[serde(alias = "webcam_mirror")]
     pub webcam_mirror: bool,
+    /// Long side of the video a mirrored phone sends, in pixels (one of
+    /// [`MIRROR_MAX_SIZES`]).
+    #[serde(default = "default_mirror_max_size", alias = "mirror_max_size")]
+    pub mirror_max_size: u32,
+    /// Frames a second in a mirrored phone's video (`30` or `60`).
+    #[serde(default = "default_mirror_fps", alias = "mirror_fps")]
+    pub mirror_fps: u32,
+    /// Target bitrate for a mirrored phone's video, in bits a second (one of
+    /// [`MIRROR_BITRATES`]).
+    #[serde(default = "default_mirror_bitrate", alias = "mirror_bitrate")]
+    pub mirror_bitrate: u32,
     /// Where a phone's microphone plays (an output endpoint ID; `None`: a
     /// virtual audio cable if there is one, else the default output).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -520,6 +568,9 @@ impl Default for Settings {
             webcam_phone: None,
             webcam_height: 720,
             webcam_mirror: false,
+            mirror_max_size: default_mirror_max_size(),
+            mirror_fps: default_mirror_fps(),
+            mirror_bitrate: default_mirror_bitrate(),
             webcam_camera: default_webcam_camera(),
             phone_mic_output: None,
             phone_mic_gain: crate::phone_mic::DEFAULT_GAIN,
@@ -567,6 +618,9 @@ impl Settings {
 
     pub fn sanitized(mut self) -> Self {
         self.webcam_camera = normalize_webcam_camera(&self.webcam_camera);
+        self.mirror_max_size = normalize_mirror_max_size(self.mirror_max_size);
+        self.mirror_fps = normalize_mirror_fps(self.mirror_fps);
+        self.mirror_bitrate = normalize_mirror_bitrate(self.mirror_bitrate);
         self.walkthrough_step = self.walkthrough_step.min(6);
         self.window_screen = self.window_screen.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
         self.window_width = self.window_width.clamp(MIN_WINDOW_WIDTH, MAX_WINDOW_WIDTH);
@@ -609,6 +663,7 @@ impl Settings {
         set_share_pc_storage(self.share_pc_storage);
         set_forward_pc_notifications_to_phone(self.forward_pc_notifications_to_phone);
         set_away_mode(self.away_mode);
+        crate::mirror::set_quality(self.mirror_max_size, self.mirror_fps, self.mirror_bitrate);
         set_window_geometry(
             self.window_screen.clone(),
             self.window_x,
@@ -738,6 +793,9 @@ mod tests {
             webcam_height: 2160,
             webcam_mirror: true,
             webcam_camera: "front".into(),
+            mirror_max_size: 1080,
+            mirror_fps: 30,
+            mirror_bitrate: 12_000_000,
             phone_mic_output: Some("{0.0.0.00000000}.{cable}".into()),
             phone_mic_gain: 250,
             timeline_retention_days: 30,
@@ -776,6 +834,20 @@ mod tests {
         };
         settings.save(dir.path()).unwrap();
         assert_eq!(Settings::load(dir.path()), settings);
+    }
+
+    #[test]
+    fn mirror_quality_snaps_to_the_offered_values() {
+        let s = Settings {
+            mirror_max_size: 1300,
+            mirror_fps: 50,
+            mirror_bitrate: 13_000_000,
+            ..Default::default()
+        }
+        .sanitized();
+        assert_eq!(s.mirror_max_size, 1440);
+        assert_eq!(s.mirror_fps, 60);
+        assert_eq!(s.mirror_bitrate, 12_000_000);
     }
 
     #[test]

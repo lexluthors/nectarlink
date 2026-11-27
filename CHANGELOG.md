@@ -110,6 +110,12 @@ has a Stop button. Choosing another
   video, in 4% steps, as with KDE Connect. When the phone plays something
   itself, or the PC is paused, they work on the phone as usual. Turn it off
   in the phone's **Settings › Control your PC**.
+- **Mirroring quality is yours to pick.** In **Settings › Screen
+  mirroring**, choose the resolution (720p, 1080p, 1440p or 1920p), frame
+  rate (30 or 60 fps) and bitrate (4 to 20 Mbps) the phone sends its screen
+  and app windows at. Higher is sharper and uses more of the link; lower
+  keeps slow networks smooth. A change applies the next time a screen or
+  app window opens.
 
 ### Changed
 

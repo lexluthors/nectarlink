@@ -39,18 +39,45 @@ use crate::{
     },
 };
 
-/// What the PC asks for: the phone scales its screen to fit.
-const OPTIONS: MirrorStart = MirrorStart {
-    max_size: 1920,
-    fps: 60,
-    bitrate: 8_000_000,
-    audio: true,
-    session: MIRROR_SCREEN,
-    app: None,
-    stay_awake: false,
-    screen_off: false,
-    watch: None,
-};
+/// What the PC asks of a phone's video: the quality chosen in Settings (see
+/// `crate::settings`), read when a mirroring starts, so a change applies to
+/// the next one. An app window's resize also keeps within `MAX_SIZE`.
+static MAX_SIZE: AtomicU32 = AtomicU32::new(1920);
+static FPS: AtomicU32 = AtomicU32::new(60);
+static BITRATE: AtomicU32 = AtomicU32::new(8_000_000);
+
+/// Applies the quality chosen in Settings: the phone scales its screen to fit
+/// `max_size` (its longest side), encodes at `fps` frames a second toward
+/// `bitrate` bits a second.
+pub(crate) fn set_quality(max_size: u32, fps: u32, bitrate: u32) {
+    MAX_SIZE.store(max_size.clamp(320, 1920), Ordering::Relaxed);
+    FPS.store(fps.clamp(1, 120), Ordering::Relaxed);
+    BITRATE.store(bitrate.clamp(100_000, 50_000_000), Ordering::Relaxed);
+}
+
+fn max_size() -> u32 {
+    MAX_SIZE.load(Ordering::Relaxed)
+}
+
+fn fps() -> u32 {
+    FPS.load(Ordering::Relaxed)
+}
+
+/// What a new mirroring asks for: Settings' quality, the phone's screen, with
+/// its sound.
+fn options() -> MirrorStart {
+    MirrorStart {
+        max_size: max_size(),
+        fps: fps(),
+        bitrate: BITRATE.load(Ordering::Relaxed),
+        audio: true,
+        session: MIRROR_SCREEN,
+        app: None,
+        stay_awake: false,
+        screen_off: false,
+        watch: None,
+    }
+}
 /// Packets waiting for the decoder, at most (about two seconds).
 const BACKLOG: usize = 120;
 /// How often decode times are logged.
@@ -561,7 +588,7 @@ pub fn toggle_recording(window: Window) {
         None
     };
 
-    let mut recorder = MirrorRecorder::new(path, width, height, OPTIONS.fps, audio_cfg);
+    let mut recorder = MirrorRecorder::new(path, width, height, fps(), audio_cfg);
     if let Some(sps_pps) =
         LAST_SPS_PPS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&window))
     {
@@ -785,7 +812,7 @@ pub fn start(device: DeviceId) {
         s.windows.insert(window, Shown { phase: Phase::Asking, app: None, pkg: None });
         power(s, &device)
     });
-    request(window, MirrorStart { stay_awake, screen_off, ..OPTIONS });
+    request(window, MirrorStart { stay_awake, screen_off, ..options() });
 }
 
 /// Phone currently receiving PC keyboard input without screen mirroring.
@@ -892,7 +919,7 @@ pub fn start_app(device: DeviceId, pkg: String, label: String) {
             app: Some(pkg),
             stay_awake,
             screen_off,
-            ..OPTIONS
+            ..options()
         },
     );
 }
@@ -923,7 +950,7 @@ pub fn reopen(window: Window) {
             app: Some(pkg),
             stay_awake,
             screen_off,
-            ..OPTIONS
+            ..options()
         },
     );
 }
@@ -936,9 +963,10 @@ pub fn resize(window: Window, width: u32, height: u32) {
     }
     let (mut w, mut h) = (width.saturating_mul(2), height.saturating_mul(2));
     let longest = w.max(h);
-    if longest > OPTIONS.max_size {
-        w = (u64::from(w) * u64::from(OPTIONS.max_size) / u64::from(longest)) as u32;
-        h = (u64::from(h) * u64::from(OPTIONS.max_size) / u64::from(longest)) as u32;
+    let max_size = max_size();
+    if longest > max_size {
+        w = (u64::from(w) * u64::from(max_size) / u64::from(longest)) as u32;
+        h = (u64::from(h) * u64::from(max_size) / u64::from(longest)) as u32;
     }
     let w = (w & !1).clamp(240, 4096);
     let h = (h & !1).clamp(240, 4096);

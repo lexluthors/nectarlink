@@ -149,6 +149,13 @@ pub mod qobject {
         #[qproperty(i32, window_height)]
         /// Whether the main window was maximized when last open.
         #[qproperty(bool, window_maximized)]
+        /// Long side of a mirrored phone's video, in pixels: 720, 1080, 1440
+        /// or 1920.
+        #[qproperty(i32, mirror_max_size)]
+        /// Frames a second in a mirrored phone's video: 30 or 60.
+        #[qproperty(i32, mirror_fps)]
+        /// Target bitrate for a mirrored phone's video, in bits a second.
+        #[qproperty(i32, mirror_bitrate)]
         type Preferences = super::PreferencesRust;
 
         /// Resets the setup walkthrough to step 0 and opens it again.
@@ -339,6 +346,9 @@ pub struct PreferencesRust {
     window_width: i32,
     window_height: i32,
     window_maximized: bool,
+    mirror_max_size: i32,
+    mirror_fps: i32,
+    mirror_bitrate: i32,
     /// What the user chose (`start_with_windows` shows the default until then).
     start_choice: Option<bool>,
     /// Custom recordings folder if chosen (`None` means default).
@@ -432,6 +442,9 @@ impl cxx_qt::Initialize for qobject::Preferences {
         self.as_mut().set_window_width(settings.window_width as i32);
         self.as_mut().set_window_height(settings.window_height as i32);
         self.as_mut().set_window_maximized(settings.window_maximized);
+        self.as_mut().set_mirror_max_size(settings.mirror_max_size as i32);
+        self.as_mut().set_mirror_fps(settings.mirror_fps as i32);
+        self.as_mut().set_mirror_bitrate(settings.mirror_bitrate as i32);
         crate::win::tray::update_hotkeys(
             &settings.continuity_photo_hotkey,
             &settings.continuity_scan_hotkey,
@@ -701,6 +714,47 @@ impl cxx_qt::Initialize for qobject::Preferences {
             .release();
         self.as_mut().on_whats_new_dismissed_changed(|p| p.save()).release();
         self.as_mut().on_hive_invite_dismissed_changed(|p| p.save()).release();
+        self.as_mut()
+            .on_mirror_max_size_changed(|mut p| {
+                let size = crate::settings::normalize_mirror_max_size(p.mirror_max_size.max(0) as u32);
+                if p.mirror_max_size != size as i32 {
+                    p.as_mut().set_mirror_max_size(size as i32);
+                    return;
+                }
+                crate::mirror::set_quality(size, p.mirror_fps.max(0) as u32, p.mirror_bitrate.max(0) as u32);
+                p.save();
+            })
+            .release();
+        self.as_mut()
+            .on_mirror_fps_changed(|mut p| {
+                let fps = crate::settings::normalize_mirror_fps(p.mirror_fps.max(0) as u32);
+                if p.mirror_fps != fps as i32 {
+                    p.as_mut().set_mirror_fps(fps as i32);
+                    return;
+                }
+                crate::mirror::set_quality(
+                    p.mirror_max_size.max(0) as u32,
+                    fps,
+                    p.mirror_bitrate.max(0) as u32,
+                );
+                p.save();
+            })
+            .release();
+        self.as_mut()
+            .on_mirror_bitrate_changed(|mut p| {
+                let bitrate = crate::settings::normalize_mirror_bitrate(p.mirror_bitrate.max(0) as u32);
+                if p.mirror_bitrate != bitrate as i32 {
+                    p.as_mut().set_mirror_bitrate(bitrate as i32);
+                    return;
+                }
+                crate::mirror::set_quality(
+                    p.mirror_max_size.max(0) as u32,
+                    p.mirror_fps.max(0) as u32,
+                    bitrate,
+                );
+                p.save();
+            })
+            .release();
 
         super::subscribe(self.qt_thread(), crate::state::Changes::PREFS, Self::refresh_runtime_flags);
     }
@@ -1009,6 +1063,9 @@ impl qobject::Preferences {
             webcam_height: crate::webcam::height(),
             webcam_mirror: crate::webcam::mirror(),
             webcam_camera: crate::webcam::camera().to_owned(),
+            mirror_max_size: p.mirror_max_size.max(0) as u32,
+            mirror_fps: p.mirror_fps.max(0) as u32,
+            mirror_bitrate: p.mirror_bitrate.max(0) as u32,
             phone_mic_output: crate::phone_mic::chosen_output(),
             phone_mic_gain: crate::phone_mic::gain(),
             timeline_retention_days: p.timeline_retention_days.max(0) as u32,
